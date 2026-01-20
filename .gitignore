@@ -1,0 +1,4 @@
+plots/*
+simulation_files/*
+simulation_files_raw/*
+__pycache__/*

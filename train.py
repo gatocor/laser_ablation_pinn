@@ -26,31 +26,36 @@ test_fraction = 0.2
 # Boundary settings
 boundary_x_min = 0.4
 boundary_y_min = 1.2
-boundary_n_min = 1000
+boundary_n_min = int(1e4)
 boundary_x_max = 1.2
 boundary_y_max = 1.2
-boundary_n_max = 1000
+boundary_n_max = int(1e4)
 
 # Physics data settings
 phys_x_min = boundary_x_min
 phys_y_min = boundary_y_min
-phys_n_min = boundary_n_min
+phys_n_min = int(1e4)
 
 phys_x_max = boundary_x_max
 phys_y_max = boundary_y_max
-phys_n_max = boundary_n_max
-
+phys_n_max = int(1e4)
 phys_t_max = 1.0
 
 # Training settings
 lambda_data = 1.0
-lambda_physics = 0.01
+lambda_physics = 0.1
 
 learning_rate = 1e-4
 weight_decay = 1e-6
 
+batch_size_boundary = 1024
+batch_size_physics = 2048
+
 n_epochs = 70000
 n_epochs_refine = 2000
+
+# Progress settings
+plot_interval = 100
 
 if __name__ == "__main__":
 
@@ -82,9 +87,13 @@ if __name__ == "__main__":
     # Boundary data
     X_boundary, y_boundary = boudary(param1, param2, param3, param4, x_max=boundary_x_max, y_max=boundary_y_max, npoints_max=boundary_n_max, x_min=boundary_x_min, y_min=boundary_y_min, npoints_min=boundary_n_min)
     
-    X_boundary_device = torch.tensor(X_boundary, dtype=torch.float32).to(device)
-    y_boundary_device = torch.tensor(y_boundary, dtype=torch.float32).to(device)
-    print("Boundary data prepared")
+    X_boundary_tensor = torch.tensor(X_boundary, dtype=torch.float32)
+    y_boundary_tensor = torch.tensor(y_boundary, dtype=torch.float32)
+    
+    # Create DataLoader for boundary data
+    boundary_dataset = TensorDataset(X_boundary_tensor, y_boundary_tensor)
+    boundary_loader = DataLoader(boundary_dataset, batch_size=batch_size_boundary, shuffle=True)
+    print(f"Boundary data prepared: {len(boundary_dataset)} samples, batch size {batch_size_boundary}")
 
     # Sampling data
     X_phys_min = np.random.rand(phys_n_min, 3)
@@ -102,8 +111,12 @@ if __name__ == "__main__":
     X_param4 = np.full((X_phys.shape[0], 1), param4)
     X_phys = np.hstack([X_param1, X_param2, X_param3, X_param4, X_phys])
 
-    X_phys_device = torch.tensor(X_phys, dtype=torch.float32).to(device)
-    print("Physics data prepared")
+    X_phys_tensor = torch.tensor(X_phys, dtype=torch.float32)
+    
+    # Create DataLoader for physics data
+    physics_dataset = TensorDataset(X_phys_tensor)
+    physics_loader = DataLoader(physics_dataset, batch_size=batch_size_physics, shuffle=True)
+    print(f"Physics data prepared: {len(physics_dataset)} samples, batch size {batch_size_physics}")
 
     # Training loop    
     print("Starting training...")
@@ -116,34 +129,61 @@ if __name__ == "__main__":
             refine = False
         else:
             refine = True
-        losses = trainer.train_step(
+        
+        # Batch training
+        epoch_data_loss = 0.0
+        epoch_phys_loss = 0.0
+        epoch_total_loss = 0.0
+        num_batches = 0
+        
+        # Iterate through batches
+        for (X_boundary_batch, y_boundary_batch), (X_phys_batch,) in zip(boundary_loader, physics_loader):
+            # Move batches to device
+            X_boundary_device = X_boundary_batch.to(device)
+            y_boundary_device = y_boundary_batch.to(device)
+            X_phys_device = X_phys_batch.to(device)
+            
+            # Training step on batch
+            losses = trainer.train_step(
                 X_boundary_device, y_boundary_device,
                 X_phys_device,
                 lambda_data=lambda_data,
                 lambda_physics=lambda_physics,
                 refine=refine
             )
-        l_data.append(losses['data_loss'])
-        l_phys.append(losses['physics_loss'])
-        l_total.append(losses['total_loss'])
+            
+            # Accumulate losses
+            epoch_data_loss += losses['data_loss']
+            epoch_phys_loss += losses['physics_loss']
+            epoch_total_loss += losses['total_loss']
+            num_batches += 1
+        
+        # Average losses over batches
+        avg_data_loss = epoch_data_loss / num_batches
+        avg_phys_loss = epoch_phys_loss / num_batches
+        avg_total_loss = epoch_total_loss / num_batches
+        
+        l_data.append(avg_data_loss)
+        l_phys.append(avg_phys_loss)
+        l_total.append(avg_total_loss)
     
         if epoch < n_epochs:
-            trainer.scheduler.step(losses["data_loss"])
+            trainer.scheduler.step(avg_data_loss)
 
-        if (epoch + 1) % 1000 == 0:
+        if (epoch + 1) % plot_interval == 0:
             if refine:
                 print(
                     f"Epoch {epoch+1}/{n_epochs+n_epochs_refine} (Refine) - "
-                    f"Data Loss: {losses['data_loss']:.6f}, "
-                    f"Physics Loss: {losses['physics_loss']:.6f}, "
-                    f"Total Loss: {losses['total_loss']:.6f}"
+                    f"Data Loss: {avg_data_loss:.6f}, "
+                    f"Physics Loss: {avg_phys_loss:.6f}, "
+                    f"Total Loss: {avg_total_loss:.6f}"
                 )
             else:
                 print(
                     f"Epoch {epoch+1}/{n_epochs+n_epochs_refine} - "
-                    f"Data Loss: {losses['data_loss']:.6f}, "
-                    f"Physics Loss: {losses['physics_loss']:.6f}, "
-                    f"Total Loss: {losses['total_loss']:.6f}"
+                    f"Data Loss: {avg_data_loss:.6f}, "
+                    f"Physics Loss: {avg_phys_loss:.6f}, "
+                    f"Total Loss: {avg_total_loss:.6f}"
                 )
 
             plot_pinn_profiles(dataset, model, param1, param2, param3, param4, save_path="plots/profiles.png")

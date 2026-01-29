@@ -195,7 +195,13 @@ def plot_pinn_profiles(dataset, model, param1=1.0, param2=1.0, param3=1.0, param
         plt.tight_layout()
     
     if save_path:
-        plt.savefig(save_path, dpi=300)
+        # Create parent directory if it doesn't exist
+        save_dir = os.path.dirname(save_path)
+        if save_dir:  # only if a directory part is present
+            os.makedirs(save_dir, exist_ok=True)
+
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
     
     return fig, (ax1, ax2, ax3)
 

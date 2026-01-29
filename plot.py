@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 from pathlib import Path
 from dataload import get_closer_parameters
+import os
 
 def plot_profiles(dataset, param1=1.0, param2=1.0, param3=1.0, param4=0.0, 
                            figsize=(18, 6), save_path=None):

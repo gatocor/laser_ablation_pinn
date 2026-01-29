@@ -148,7 +148,7 @@ class PINN(nn.Module):
 
         # (1 + alpha2 (d_dt + v_k d_dx_k))(s_ij-h delta_ij) = alpha1^2 h (dd_dxx_ik s_kj + dd_dxx_jk s_ki + 2 dd_dxx_km s_mk delta_ij)
         loss_eq9_xx = (
-                        ( sxx - h ) + alpha2*( dsxx_dt - dh_dt ) + alpha2*( vx * dsxx_dx + vy * dsxx_dy - vx * dh_dx - vy * dh_dy ) \
+                        ( sxx - h ) + alpha2*(dsxx_dt - dh_dt ) + alpha2*( vx * dsxx_dx + vy * dsxx_dy - vx * dh_dx - vy * dh_dy ) \
                         - alpha1**2 * h * ( 
                             2 * ddsxx_dxx + 2 * ddsyx_dxy + 2 * ( ddsxx_dxx + ddsyy_dyy + ddsxy_dyx + ddsyx_dxy) 
                         )

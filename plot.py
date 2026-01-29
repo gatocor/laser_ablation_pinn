@@ -259,7 +259,7 @@ def plot_learning_curve(data_losses, physics_losses, total_losses, fig=None, fig
 
     return fig, ax
 
-if True:
+if False:
 
     import pandas as pd
     import numpy as np

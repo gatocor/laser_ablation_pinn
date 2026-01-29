@@ -42,7 +42,7 @@ def boudary(par1,par2,par3,par4,x_max=10,y_max=10,npoints_max=1000, x_min=.4, y_
 
     return parameters, data
 
-if True:
+if False:
 
     import seaborn as sns
     import matplotlib.pyplot as plt
